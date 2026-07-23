@@ -50,7 +50,7 @@
 
   <div class="container">
     <h1>Simulador de Venda Parcelada</h1>
-    <p class="subtitle">Ajuste os valores das parcelas com taxa de juros para neutralizar o parcelamento</p>
+    <p class="subtitle">Cálculo de parcelas iguais com entrada no ato (t=0)</p>
 
     <div class="grid-inputs">
       <div class="form-group">
@@ -126,10 +126,11 @@
       } else if (n === 1) {
         pmt = PV;
       } else {
-        // Fórmula da Tabela Price considerando Entrada em t=0
-        // Parcela = PV * [ i*(1+i)^(n-1) ] / [ (1+i)^(n-1) - 1 ]
-        const fator = Math.pow(1 + i, n - 1);
-        pmt = PV * ((i * fator) / (fator - 1));
+        // Fórmula exata para N parcelas iguais com a 1ª no ato (t=0):
+        // PV = PMT + PMT / (1+i) + PMT / (1+i)^2 + ...
+        // PMT = PV / [ 1 + (1 - (1+i)^(-(n-1))) / i ]
+        const fatorAnuidade = (1 - Math.pow(1 + i, -(n - 1))) / i;
+        pmt = PV / (1 + fatorAnuidade);
       }
 
       const totalRecebido = pmt * n;
@@ -148,18 +149,26 @@
 
       for (let k = 1; k <= n; k++) {
         let juros = 0;
-        if (k > 1) {
-          juros = saldoDevedor * i;
-        }
-        let amortizacao = pmt - juros;
+        let amortizacao = 0;
         let saldoInicial = saldoDevedor;
-        saldoDevedor -= amortizacao;
+
+        if (k === 1) {
+          // 1ª Parcela (Entrada no ato - sem juros passados)
+          juros = 0;
+          amortizacao = pmt;
+          saldoDevedor -= amortizacao;
+        } else {
+          // Parcelas subsequentes (1 ano de juros acumulados sobre o saldo devedor restante)
+          juros = saldoDevedor * i;
+          amortizacao = pmt - juros;
+          saldoDevedor -= amortizacao;
+        }
 
         if (Math.abs(saldoDevedor) < 0.01) saldoDevedor = 0;
 
         const row = `
           <tr>
-            <td>${k}ª (Ago/${anoAtual + k - 1})</td>
+            <td>${k}ª (Ago/${anoAtual + k - 1}) ${k === 1 ? '<small>(Entrada)</small>' : ''}</td>
             <td>${formatarBRL(saldoInicial)}</td>
             <td>${formatarBRL(juros)}</td>
             <td>${formatarBRL(amortizacao)}</td>
@@ -170,12 +179,12 @@
       }
     }
 
-    // Event Listeners para atualizar dinamicamente ao digitar
+    // Event Listeners para atualizar dinamicamente
     document.getElementById('valorVista').addEventListener('input', calcular);
     document.getElementById('numParcelas').addEventListener('input', calcular);
     document.getElementById('taxaJuros').addEventListener('input', calcular);
 
-    // Cálculo inicial na carga da página
+    // Cálculo inicial
     calcular();
   </script>
 </body>
