@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simulador de Venda Parcelada de Imóvel</title>
+  <title>Simulador Imobiliário Rural Pro</title>
+  <!-- Bibliotecas jsPDF e AutoTable para geração do PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -14,34 +17,76 @@
       --text-sub: #94a3b8;
       --border: #334155;
       --green: #4ade80;
+      --coffee: #eab308;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
     
-    .container { background-color: var(--card-bg); border-radius: 16px; padding: 32px; width: 100%; max-width: 800px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid var(--border); }
-    h1 { font-size: 1.6rem; color: var(--accent); margin-bottom: 8px; text-align: center; }
-    p.subtitle { text-align: center; color: var(--text-sub); font-size: 0.95rem; margin-bottom: 24px; }
+    .container { background-color: var(--card-bg); border-radius: 16px; padding: 32px; width: 100%; max-width: 900px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid var(--border); }
+    h1 { font-size: 1.6rem; color: var(--accent); margin-bottom: 4px; text-align: center; }
+    p.subtitle { text-align: center; color: var(--text-sub); font-size: 0.9rem; margin-bottom: 24px; }
     
-    .grid-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
-    label { font-size: 0.85rem; color: var(--text-sub); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    input, select { background: var(--bg-color); border: 1px solid var(--border); color: var(--text-main); padding: 12px; border-radius: 8px; font-size: 1rem; outline: none; transition: 0.2s; }
-    input:focus, select:focus { border-color: var(--accent); }
+    .section-title { font-size: 1.1rem; color: var(--coffee); margin-bottom: 12px; font-weight: 600; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
 
-    .quick-buttons { display: flex; gap: 8px; margin-bottom: 24px; justify-content: center; }
+    .grid-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full-width { grid-column: 1 / -1; }
+    
+    label { font-size: 0.8rem; color: var(--text-sub); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    input, select, textarea { background: var(--bg-color); border: 1px solid var(--border); color: var(--text-main); padding: 12px; border-radius: 8px; font-size: 0.95rem; outline: none; transition: 0.2s; }
+    textarea { resize: vertical; min-height: 80px; line-height: 1.4; }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+
+    .img-preview-box {
+      margin-top: 8px;
+      display: none;
+      text-align: center;
+      background: var(--bg-color);
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px dashed var(--border);
+    }
+    .img-preview-box img {
+      max-width: 100%;
+      max-height: 180px;
+      border-radius: 6px;
+      object-fit: contain;
+    }
+
+    .quick-buttons { display: flex; gap: 8px; margin-bottom: 24px; justify-content: center; flex-wrap: wrap; }
     .btn-preset { background: var(--border); color: var(--text-main); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: 0.2s; }
     .btn-preset:hover { background: var(--accent-hover); }
 
-    .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .card { background: var(--bg-color); padding: 16px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
-    .card-title { font-size: 0.8rem; color: var(--text-sub); margin-bottom: 4px; text-transform: uppercase; }
-    .card-value { font-size: 1.4rem; font-weight: 700; color: var(--green); }
-    .card-value.highlight { color: var(--accent); }
+    .btn-pdf {
+      background: #10b981;
+      color: #ffffff;
+      border: none;
+      padding: 14px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 700;
+      width: 100%;
+      margin-bottom: 24px;
+      transition: 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-pdf:hover { background: #059669; }
 
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.9rem; }
-    th, td { padding: 12px; text-align: right; border-bottom: 1px solid var(--border); }
-    th { background-color: var(--bg-color); color: var(--text-sub); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
+    .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card { background: var(--bg-color); padding: 16px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
+    .card-title { font-size: 0.75rem; color: var(--text-sub); margin-bottom: 4px; text-transform: uppercase; }
+    .card-value { font-size: 1.25rem; font-weight: 700; color: var(--green); }
+    .card-value.highlight { color: var(--accent); }
+    .card-value.coffee-val { color: var(--coffee); }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.85rem; }
+    th, td { padding: 10px; text-align: right; border-bottom: 1px solid var(--border); }
+    th { background-color: var(--bg-color); color: var(--text-sub); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
     th:first-child, td:first-child { text-align: left; }
     tr:hover { background-color: rgba(255,255,255,0.02); }
   </style>
@@ -49,13 +94,77 @@
 <body>
 
   <div class="container">
-    <h1>Simulador de Venda Parcelada</h1>
-    <p class="subtitle">Cálculo de parcelas iguais com entrada no ato (t=0)</p>
+    <h1>Simulador Imobiliário Rural</h1>
+    <p class="subtitle">Avaliação por Produtividade Cafeeira & Gerador de Carta Proposta</p>
 
+    <!-- ETAPA 1: DADOS DA PROPRIEDADE E AVALIAÇÃO DA TERRA -->
+    <div class="section-title">1. Dados do Imóvel & Avaliação da Terra</div>
     <div class="grid-inputs">
       <div class="form-group">
-        <label>Valor À Vista (R$)</label>
-        <input type="number" id="valorVista" value="700000" step="10000">
+        <label>Nome / Identificação da Propriedade</label>
+        <input type="text" id="nomePropriedade" value="PARTE DA CHACARA IRMÃOS BOTELHO">
+      </div>
+      <div class="form-group">
+        <label>Matrícula do Imóvel</label>
+        <input type="text" id="matriculaImovel" value="45.568">
+      </div>
+      <div class="form-group">
+        <label>Tipo / Qualidade do Solo</label>
+        <select id="tipoSolo">
+          <option value="62">Apenas Pasto (62 sacas/alq)</option>
+          <option value="55">Pasto e RL sem Declive (55 sacas/alq)</option>
+          <option value="50">Pasto e RL com Declive (50 sacas/alq)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Preço da Saca de Café (R$)</label>
+        <input type="number" id="precoSaca" value="1740" step="10">
+      </div>
+      <div class="form-group">
+        <label>Unidade de Medida da Área</label>
+        <select id="unidadeMedida">
+          <option value="hectare" selected>Hectares (ha)</option>
+          <option value="alqueire">Alqueires (4,84 ha)</option>
+          <option value="m2">Metros Quadrados (m²)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label id="labelArea">Área Disponível (Hectares)</label>
+        <input type="number" id="valorAreaInput" value="10.4430" step="0.0001">
+      </div>
+      
+      <!-- CAMPO EDITÁVEL DO PERÍMETRO -->
+      <div class="form-group full-width">
+        <label>Descrição do Perímetro / Confrontantes (Editável)</label>
+        <textarea id="descricaoPerimetro">Esse perímetro parte do ponto K1 (porteira de entrada da propriedade), segue pela estrada particular da propriedade até o ponto K2 (ponto alinhado a cachoeira), deste segue até a base da cachoeira onde está o K3, sobe pelo rio até a divisa no rio com o Proprietario Mario Alves no K4, deste segue a cerca até a estrada municipal K5, deste segue a estrada até o K6 (divisa com Mercio Botelho), deste segue até o K7 e K8 (Cerca no pasto), do K8 segue a cerca até a estrada municipal K9, segue a estrada municipal até o K1 (porteira de entrada da propriedade).</textarea>
+      </div>
+
+      <!-- CAMPO DE UPLOAD DA IMAGEM E SELEÇÃO DE ESCALA -->
+      <div class="form-group">
+        <label>Imagem da Planta / Polígono (Opcional)</label>
+        <input type="file" id="imagemPoligono" accept="image/png, image/jpeg, image/jpg" onchange="previewImagem(event)">
+      </div>
+      <div class="form-group">
+        <label>Tamanho da Imagem no PDF</label>
+        <select id="escalaImagem">
+          <option value="1" selected>1x (Padrao - 60mm)</option>
+          <option value="2">2x (Médio - 120mm)</option>
+          <option value="3">3x (Grande - 180mm Largura Máxima)</option>
+        </select>
+      </div>
+      <div class="form-group full-width">
+        <div class="img-preview-box" id="previewBox">
+          <img id="imgPreview" src="" alt="Pré-visualização do Polígono">
+        </div>
+      </div>
+    </div>
+
+    <!-- ETAPA 2: PARCELAMENTO -->
+    <div class="section-title">2. Condições do Parcelamento & Observações</div>
+    <div class="grid-inputs">
+      <div class="form-group">
+        <label>Valor À Vista Projetado (R$)</label>
+        <input type="number" id="valorVista" value="0" step="10000">
       </div>
       <div class="form-group">
         <label>Número de Parcelas Anuais</label>
@@ -65,6 +174,12 @@
         <label>Taxa de Juros Anual (%)</label>
         <input type="number" id="taxaJuros" value="10.5" step="0.5">
       </div>
+
+      <!-- CAMPO EDITÁVEL DE OBSERVAÇÕES ADICIONAIS -->
+      <div class="form-group full-width">
+        <label>Observações Adicionais / Cláusulas Especiais (Opcional)</label>
+        <textarea id="observacoesAdicionais" placeholder="Insira aqui observações específicas, prazos diferenciados, condições para entrega da posse, benfeitorias inclusas, etc."></textarea>
+      </div>
     </div>
 
     <div class="quick-buttons">
@@ -72,7 +187,21 @@
       <button class="btn-preset" onclick="setTaxa(15.0)">Atrelar à Carteira (15,0% a.a.)</button>
     </div>
 
+    <!-- BOTÃO PARA GERAR O PDF -->
+    <button class="btn-pdf" onclick="gerarPDF()">
+      📄 Gerar Carta Proposta Completa (PDF)
+    </button>
+
+    <!-- CARDS DE RESULTADOS -->
     <div class="summary-cards">
+      <div class="card">
+        <div class="card-title">Área Calculada</div>
+        <div class="card-value coffee-val" id="resAreaAlqueires">0 Alq</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Valor do Alqueire</div>
+        <div class="card-value coffee-val" id="resValorAlqueire">R$ 0,00</div>
+      </div>
       <div class="card">
         <div class="card-title">Valor por Parcela Fixa</div>
         <div class="card-value highlight" id="resParcela">R$ 0,00</div>
@@ -87,7 +216,8 @@
       </div>
     </div>
 
-    <table>
+    <!-- TABELA DE CRONOGRAMA -->
+    <table id="tabelaCronograma">
       <thead>
         <tr>
           <th>Parcela</th>
@@ -104,17 +234,104 @@
   </div>
 
   <script>
+    let imagemBase64 = null;
+    let imgDim = { width: 0, height: 0, format: 'JPEG' };
+
     function formatarBRL(valor) {
       return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
     function setTaxa(valor) {
       document.getElementById('taxaJuros').value = valor;
-      calcular();
+      calcularTudo();
     }
 
-    function calcular() {
-      const PV = parseFloat(document.getElementById('valorVista').value) || 0;
+    function atualizarLabelUnidade() {
+      const unidade = document.getElementById('unidadeMedida').value;
+      const label = document.getElementById('labelArea');
+      
+      if (unidade === 'm2') {
+        label.innerText = 'Área Disponível (m²)';
+      } else if (unidade === 'hectare') {
+        label.innerText = 'Área Disponível (Hectares)';
+      } else {
+        label.innerText = 'Área Disponível (Alqueires)';
+      }
+    }
+
+    function previewImagem(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          imagemBase64 = e.target.result;
+          
+          const img = new Image();
+          img.onload = function() {
+            imgDim.width = img.width;
+            imgDim.height = img.height;
+            imgDim.format = file.type.includes('png') ? 'PNG' : 'JPEG';
+          };
+          img.src = imagemBase64;
+
+          document.getElementById('imgPreview').src = imagemBase64;
+          document.getElementById('previewBox').style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+      } else {
+        imagemBase64 = null;
+        document.getElementById('previewBox').style.display = 'none';
+      }
+    }
+
+    function obterEConverterParaAlqueires() {
+      const unidade = document.getElementById('unidadeMedida').value;
+      const valorDigitado = parseFloat(document.getElementById('valorAreaInput').value) || 0;
+
+      let alqueires = valorDigitado;
+      let hectares = valorDigitado;
+
+      if (unidade === 'm2') {
+        alqueires = valorDigitado / 48400;
+        hectares = valorDigitado / 10000;
+      } else if (unidade === 'hectare') {
+        alqueires = valorDigitado / 4.84;
+        hectares = valorDigitado;
+      } else {
+        alqueires = valorDigitado;
+        hectares = valorDigitado * 4.84;
+      }
+
+      return { alqueires, hectares, unidade, valorDigitado };
+    }
+
+    function calcularValorImovel() {
+      const sacasPorAlqueireBase = parseFloat(document.getElementById('tipoSolo').value) || 0;
+      const precoSaca = parseFloat(document.getElementById('precoSaca').value) || 0;
+      const { alqueires, hectares } = obterEConverterParaAlqueires();
+
+      const valorPorAlqueire = sacasPorAlqueireBase * precoSaca * 4.84;
+      const valorTotalVista = valorPorAlqueire * alqueires;
+
+      document.getElementById('resValorAlqueire').innerText = formatarBRL(valorPorAlqueire);
+      
+      const alqFormatado = alqueires.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+      document.getElementById('resAreaAlqueires').innerText = `${alqFormatado} Alq`;
+      
+      return { valorTotalVista, valorPorAlqueire, alqueires, hectares, sacasPorAlqueireBase, precoSaca };
+    }
+
+    function calcularTudo() {
+      atualizarLabelUnidade();
+      const { valorTotalVista } = calcularValorImovel();
+
+      let PV = parseFloat(document.getElementById('valorVista').value);
+      
+      if (!PV || document.activeElement.id !== 'valorVista') {
+        PV = valorTotalVista;
+        document.getElementById('valorVista').value = Math.round(PV);
+      }
+
       const n = parseInt(document.getElementById('numParcelas').value) || 1;
       const i = (parseFloat(document.getElementById('taxaJuros').value) || 0) / 100;
 
@@ -126,9 +343,6 @@
       } else if (n === 1) {
         pmt = PV;
       } else {
-        // Fórmula exata para N parcelas iguais com a 1ª no ato (t=0):
-        // PV = PMT + PMT / (1+i) + PMT / (1+i)^2 + ...
-        // PMT = PV / [ 1 + (1 - (1+i)^(-(n-1))) / i ]
         const fatorAnuidade = (1 - Math.pow(1 + i, -(n - 1))) / i;
         pmt = PV / (1 + fatorAnuidade);
       }
@@ -140,7 +354,6 @@
       document.getElementById('resTotal').innerText = formatarBRL(totalRecebido);
       document.getElementById('resJuros').innerText = formatarBRL(jurosTotais);
 
-      // Preenchimento da Tabela
       const tabela = document.getElementById('tabelaCorpo');
       tabela.innerHTML = '';
 
@@ -153,12 +366,10 @@
         let saldoInicial = saldoDevedor;
 
         if (k === 1) {
-          // 1ª Parcela (Entrada no ato - sem juros passados)
           juros = 0;
           amortizacao = pmt;
           saldoDevedor -= amortizacao;
         } else {
-          // Parcelas subsequentes (1 ano de juros acumulados sobre o saldo devedor restante)
           juros = saldoDevedor * i;
           amortizacao = pmt - juros;
           saldoDevedor -= amortizacao;
@@ -179,13 +390,209 @@
       }
     }
 
-    // Event Listeners para atualizar dinamicamente
-    document.getElementById('valorVista').addEventListener('input', calcular);
-    document.getElementById('numParcelas').addEventListener('input', calcular);
-    document.getElementById('taxaJuros').addEventListener('input', calcular);
+    // --- FUNÇÃO DE GERAÇÃO DA CARTA PROPOSTA EM PDF ---
+    function gerarPDF() {
+      const { window } = globalThis;
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      const dataHoje = new Date().toLocaleDateString('pt-BR');
+      const nomePropriedade = document.getElementById('nomePropriedade').value;
+      const matricula = document.getElementById('matriculaImovel').value;
+      const textoPerimetroInput = document.getElementById('descricaoPerimetro').value;
+      const obsInput = document.getElementById('observacoesAdicionais').value.trim();
+      const multiplicadorEscala = parseFloat(document.getElementById('escalaImagem').value) || 1;
+      
+      const { valorTotalVista, valorPorAlqueire, alqueires, hectares } = calcularValorImovel();
+      
+      const numParcelas = document.getElementById('numParcelas').value;
+      const taxaJuros = document.getElementById('taxaJuros').value;
+      const valorTotalBruto = document.getElementById('resTotal').innerText;
+
+      // Cabeçalho da Proposta
+      doc.setFillColor(30, 41, 59);
+      doc.rect(0, 0, 210, 32, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text("CARTA PROPOSTA DE VENDA IMOBILIÁRIA RURAL", 14, 18);
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Data de Emissão: ${dataHoje}  |  Matrícula nº: ${matricula}`, 14, 26);
+
+      let currentY = 40;
+
+      // OBJETO EM NEGOCIAÇÃO
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`PROPRIEDADE: ${nomePropriedade.toUpperCase()}`, 14, currentY);
+      currentY += 6;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const textoObjeto1 = `Esta proposta incide apenas sobre o percentual da área da matrícula nº ${matricula}. O montante desta gleba limita-se a um total de ${hectares.toFixed(4)} hectares (aproximadamente ${alqueires.toFixed(4)} alqueires).`;
+      doc.text(doc.splitTextToSize(textoObjeto1, 180), 14, currentY);
+      currentY += 10;
+
+      // Memorial descritivo
+      doc.setFont('helvetica', 'bold');
+      doc.text("Descrição do Perímetro / Confrontantes:", 14, currentY);
+      currentY += 5;
+      
+      doc.setFont('helvetica', 'normal');
+      const linhasPerimetro = doc.splitTextToSize(textoPerimetroInput, 180);
+      doc.text(linhasPerimetro, 14, currentY);
+      currentY += (linhasPerimetro.length * 4) + 2;
+
+      // INSERÇÃO DA IMAGEM COM ESCALA SELECIONÁVEL (1x, 2x, 3x)
+      if (imagemBase64 && imgDim.width > 0) {
+        // Base padrão de largura (60mm para 1x, 120mm para 2x, 180mm para 3x)
+        const baseWidth = 60; 
+        let pdfImgWidth = baseWidth * multiplicadorEscala;
+        if (pdfImgWidth > 180) pdfImgWidth = 180; // Limite da largura da folha
+
+        // Calcula altura proporcional
+        const pdfImgHeight = (imgDim.height * pdfImgWidth) / imgDim.width;
+
+        // Verifica se cabe na página antes de inserir
+        if (currentY + pdfImgHeight + 10 > 270) {
+          doc.addPage();
+          currentY = 20;
+        }
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text("Mapa / Polígono da Área Objeto:", 14, currentY);
+        currentY += 4;
+
+        // Desenha a imagem no PDF
+        doc.addImage(imagemBase64, imgDim.format, 14, currentY, pdfImgWidth, pdfImgHeight);
+        currentY += pdfImgHeight + 6;
+      }
+
+      const textoLei = "(Lei 10.406/2002, Art. 500, parágrafo 1º – Aceita-se a variação de 1/20 do total estabelecido em contrato. Presume-se que a referência às dimensões foi simplesmente enunciativa quando a diferença não exceder 1/20 da área total enunciada). Área de potencial topográfico, constituída das classes de Pastagem, Mata Nativa e Reserva Legal. Área regular diante do INCRA, com todos os impostos em dia.";
+      
+      if (currentY + 25 > 270) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      const linhasLei = doc.splitTextToSize(textoLei, 180);
+      doc.text(linhasLei, 14, currentY);
+      currentY += (linhasLei.length * 4) + 5;
+
+      // PREÇO E CUSTAS
+      doc.setFont('helvetica', 'bold');
+      doc.text("PREÇO DA GLEBA E CUSTAS TRÂMITES:", 14, currentY);
+      currentY += 5;
+
+      doc.setFont('helvetica', 'normal');
+      const textoCustas = "Ressalta-se que a alienação está direcionada à gleba com seu potencial agrícola. As custas dos trâmites de todo valor direto e indireto ligado à alienação deste OBJETO, como custas com retificação de plantas topográficas para desmembramento, locação das áreas em campo, confecção de escritura, processo de registro de imóvel, ficarão a cargo do COMPRADOR.";
+      const linhasCustas = doc.splitTextToSize(textoCustas, 180);
+      doc.text(linhasCustas, 14, currentY);
+      currentY += (linhasCustas.length * 4) + 5;
+
+      // CONDIÇÕES DO NEGÓCIO
+      doc.setFont('helvetica', 'bold');
+      doc.text("CONDIÇÕES DO NEGÓCIO E VALORES CALCULADOS:", 14, currentY);
+      currentY += 5;
+
+      doc.setFont('helvetica', 'normal');
+      doc.text(`1. Valor do Imóvel à Vista Calculado: ${formatarBRL(valorTotalVista)} (Valorado em R$ ${valorPorAlqueire.toLocaleString('pt-BR')}/Alqueire).`, 14, currentY);
+      currentY += 5;
+      doc.text(`2. Valor Total do Parcelamento (${numParcelas}x anuais a ${taxaJuros}% a.a.): ${valorTotalBruto}`, 14, currentY);
+      currentY += 5;
+      doc.text("3. O imóvel não poderá sofrer exploração nas áreas de Mata Nativa e Reserva Legal até que todas parcelas sejam quitadas.", 14, currentY);
+      currentY += 5;
+      doc.text("4. A autorização para desmembramento somente ocorrerá frente à quitação integral de todas as parcelas.", 14, currentY);
+      currentY += 5;
+      
+      const textoInadimplencia = "5. Caso o pagamento de alguma parcela não ocorra, ficará autorizado ao proprietário (constante no registro nº 45.568) a alienação de parte desta gleba/divisão até que o valor total do saldo devedor seja quitado de forma integral.";
+      const linhasInadimplencia = doc.splitTextToSize(textoInadimplencia, 180);
+      doc.text(linhasInadimplencia, 14, currentY);
+      currentY += (linhasInadimplencia.length * 4) + 5;
+
+      // OBSERVAÇÕES ADICIONAIS (SE PREENCHIDO)
+      if (obsInput !== '') {
+        if (currentY + 20 > 270) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.text("OBSERVAÇÕES ADICIONAIS / CLÁUSULAS ESPECIAIS:", 14, currentY);
+        currentY += 5;
+
+        doc.setFont('helvetica', 'normal');
+        const linhasObs = doc.splitTextToSize(obsInput, 180);
+        doc.text(linhasObs, 14, currentY);
+        currentY += (linhasObs.length * 4) + 5;
+      }
+
+      // TABELA DE CRONOGRAMA DE PAGAMENTOS
+      if (currentY + 40 > 270) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.text("CRONOGRAMA DE PAGAMENTO E AMORTIZAÇÃO:", 14, currentY);
+      currentY += 4;
+
+      doc.autoTable({
+        html: '#tabelaCronograma',
+        startY: currentY,
+        theme: 'grid',
+        headStyles: { fillStyle: 'F', fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8, halign: 'right' },
+        columnStyles: { 0: { halign: 'left' } }
+      });
+
+      // Assinaturas
+      let finalY = doc.lastAutoTable.finalY + 18;
+      if (finalY + 15 > 280) {
+        doc.addPage();
+        finalY = 30;
+      }
+
+      doc.setDrawColor(180, 180, 180);
+      doc.line(14, finalY, 95, finalY);
+      doc.line(115, finalY, 196, finalY);
+
+      doc.setFontSize(8);
+      doc.text("Assinatura do Comprador / Proponente", 25, finalY + 5);
+      doc.text("Assinatura do Vendedor / Proprietário", 125, finalY + 5);
+
+      // Salvar PDF
+      doc.save(`Carta_Proposta_${matricula.replace(/\./g, '')}.pdf`);
+    }
+
+    // Event Listeners
+    document.getElementById('unidadeMedida').addEventListener('change', () => {
+      document.getElementById('valorVista').value = 0;
+      calcularTudo();
+    });
+    document.getElementById('tipoSolo').addEventListener('change', () => {
+      document.getElementById('valorVista').value = 0;
+      calcularTudo();
+    });
+    document.getElementById('precoSaca').addEventListener('input', () => {
+      document.getElementById('valorVista').value = 0;
+      calcularTudo();
+    });
+    document.getElementById('valorAreaInput').addEventListener('input', () => {
+      document.getElementById('valorVista').value = 0;
+      calcularTudo();
+    });
+
+    document.getElementById('valorVista').addEventListener('input', calcularTudo);
+    document.getElementById('numParcelas').addEventListener('input', calcularTudo);
+    document.getElementById('taxaJuros').addEventListener('input', calcularTudo);
 
     // Cálculo inicial
-    calcular();
+    calcularTudo();
   </script>
 </body>
 </html>
