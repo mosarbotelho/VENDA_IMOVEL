@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Venda Parcelada de Imóvel</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --border: #334155;
+      --green: #4ade80;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    
+    .container { background-color: var(--card-bg); border-radius: 16px; padding: 32px; width: 100%; max-width: 800px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid var(--border); }
+    h1 { font-size: 1.6rem; color: var(--accent); margin-bottom: 8px; text-align: center; }
+    p.subtitle { text-align: center; color: var(--text-sub); font-size: 0.95rem; margin-bottom: 24px; }
+    
+    .grid-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 0.85rem; color: var(--text-sub); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    input, select { background: var(--bg-color); border: 1px solid var(--border); color: var(--text-main); padding: 12px; border-radius: 8px; font-size: 1rem; outline: none; transition: 0.2s; }
+    input:focus, select:focus { border-color: var(--accent); }
+
+    .quick-buttons { display: flex; gap: 8px; margin-bottom: 24px; justify-content: center; }
+    .btn-preset { background: var(--border); color: var(--text-main); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: 0.2s; }
+    .btn-preset:hover { background: var(--accent-hover); }
+
+    .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card { background: var(--bg-color); padding: 16px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
+    .card-title { font-size: 0.8rem; color: var(--text-sub); margin-bottom: 4px; text-transform: uppercase; }
+    .card-value { font-size: 1.4rem; font-weight: 700; color: var(--green); }
+    .card-value.highlight { color: var(--accent); }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.9rem; }
+    th, td { padding: 12px; text-align: right; border-bottom: 1px solid var(--border); }
+    th { background-color: var(--bg-color); color: var(--text-sub); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
+    th:first-child, td:first-child { text-align: left; }
+    tr:hover { background-color: rgba(255,255,255,0.02); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Simulador de Venda Parcelada</h1>
+    <p class="subtitle">Cálculo de parcelas iguais com entrada no ato (t=0)</p>
+
+    <div class="grid-inputs">
+      <div class="form-group">
+        <label>Valor À Vista (R$)</label>
+        <input type="number" id="valorVista" value="700000" step="10000">
+      </div>
+      <div class="form-group">
+        <label>Número de Parcelas Anuais</label>
+        <input type="number" id="numParcelas" value="3" min="1" max="10">
+      </div>
+      <div class="form-group">
+        <label>Taxa de Juros Anual (%)</label>
+        <input type="number" id="taxaJuros" value="10.5" step="0.5">
+      </div>
+    </div>
+
+    <div class="quick-buttons">
+      <button class="btn-preset" onclick="setTaxa(10.5)">Atrelar ao CDI (10,5% a.a.)</button>
+      <button class="btn-preset" onclick="setTaxa(15.0)">Atrelar à Carteira (15,0% a.a.)</button>
+    </div>
+
+    <div class="summary-cards">
+      <div class="card">
+        <div class="card-title">Valor por Parcela Fixa</div>
+        <div class="card-value highlight" id="resParcela">R$ 0,00</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Total Bruto Recebido</div>
+        <div class="card-value" id="resTotal">R$ 0,00</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Juros Totais Embutidos</div>
+        <div class="card-value" id="resJuros">R$ 0,00</div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Parcela</th>
+          <th>Saldo Inicial</th>
+          <th>Juros</th>
+          <th>Amortização</th>
+          <th>Valor da Parcela</th>
+        </tr>
+      </thead>
+      <tbody id="tabelaCorpo">
+        <!-- Preenchido via JavaScript -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    function formatarBRL(valor) {
+      return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function setTaxa(valor) {
+      document.getElementById('taxaJuros').value = valor;
+      calcular();
+    }
+
+    function calcular() {
+      const PV = parseFloat(document.getElementById('valorVista').value) || 0;
+      const n = parseInt(document.getElementById('numParcelas').value) || 1;
+      const i = (parseFloat(document.getElementById('taxaJuros').value) || 0) / 100;
+
+      if (PV <= 0 || n <= 0) return;
+
+      let pmt = 0;
+      if (i === 0) {
+        pmt = PV / n;
+      } else if (n === 1) {
+        pmt = PV;
+      } else {
+        // Fórmula exata para N parcelas iguais com a 1ª no ato (t=0):
+        // PV = PMT + PMT / (1+i) + PMT / (1+i)^2 + ...
+        // PMT = PV / [ 1 + (1 - (1+i)^(-(n-1))) / i ]
+        const fatorAnuidade = (1 - Math.pow(1 + i, -(n - 1))) / i;
+        pmt = PV / (1 + fatorAnuidade);
+      }
+
+      const totalRecebido = pmt * n;
+      const jurosTotais = totalRecebido - PV;
+
+      document.getElementById('resParcela').innerText = formatarBRL(pmt);
+      document.getElementById('resTotal').innerText = formatarBRL(totalRecebido);
+      document.getElementById('resJuros').innerText = formatarBRL(jurosTotais);
+
+      // Preenchimento da Tabela
+      const tabela = document.getElementById('tabelaCorpo');
+      tabela.innerHTML = '';
+
+      let saldoDevedor = PV;
+      let anoAtual = new Date().getFullYear();
+
+      for (let k = 1; k <= n; k++) {
+        let juros = 0;
+        let amortizacao = 0;
+        let saldoInicial = saldoDevedor;
+
+        if (k === 1) {
+          // 1ª Parcela (Entrada no ato - sem juros passados)
+          juros = 0;
+          amortizacao = pmt;
+          saldoDevedor -= amortizacao;
+        } else {
+          // Parcelas subsequentes (1 ano de juros acumulados sobre o saldo devedor restante)
+          juros = saldoDevedor * i;
+          amortizacao = pmt - juros;
+          saldoDevedor -= amortizacao;
+        }
+
+        if (Math.abs(saldoDevedor) < 0.01) saldoDevedor = 0;
+
+        const row = `
+          <tr>
+            <td>${k}ª (Ago/${anoAtual + k - 1}) ${k === 1 ? '<small>(Entrada)</small>' : ''}</td>
+            <td>${formatarBRL(saldoInicial)}</td>
+            <td>${formatarBRL(juros)}</td>
+            <td>${formatarBRL(amortizacao)}</td>
+            <td><strong>${formatarBRL(pmt)}</strong></td>
+          </tr>
+        `;
+        tabela.innerHTML += row;
+      }
+    }
+
+    // Event Listeners para atualizar dinamicamente
+    document.getElementById('valorVista').addEventListener('input', calcular);
+    document.getElementById('numParcelas').addEventListener('input', calcular);
+    document.getElementById('taxaJuros').addEventListener('input', calcular);
+
+    // Cálculo inicial
+    calcular();
+  </script>
+</body>
+</html>
