@@ -58,24 +58,48 @@
     .btn-preset { background: var(--border); color: var(--text-main); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: 0.2s; }
     .btn-preset:hover { background: var(--accent-hover); }
 
+    .pdf-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
     .btn-pdf {
       background: #10b981;
       color: #ffffff;
       border: none;
-      padding: 14px 24px;
+      padding: 14px 20px;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 1rem;
+      font-size: 0.95rem;
       font-weight: 700;
-      width: 100%;
-      margin-bottom: 24px;
       transition: 0.2s;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
+      text-align: center;
     }
     .btn-pdf:hover { background: #059669; }
+
+    .btn-pdf-no-interest {
+      background: #0284c7;
+      color: #ffffff;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 700;
+      transition: 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-align: center;
+    }
+    .btn-pdf-no-interest:hover { background: #0369a1; }
 
     .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .card { background: var(--bg-color); padding: 16px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
@@ -147,7 +171,7 @@
       <div class="form-group">
         <label>Tamanho da Imagem no PDF</label>
         <select id="escalaImagem">
-          <option value="1" selected>1x (Padrao - 60mm)</option>
+          <option value="1" selected>1x (Padrão - 60mm)</option>
           <option value="2">2x (Médio - 120mm)</option>
           <option value="3">3x (Grande - 180mm Largura Máxima)</option>
         </select>
@@ -187,10 +211,15 @@
       <button class="btn-preset" onclick="setTaxa(15.0)">Atrelar à Carteira (15,0% a.a.)</button>
     </div>
 
-    <!-- BOTÃO PARA GERAR O PDF -->
-    <button class="btn-pdf" onclick="gerarPDF()">
-      📄 Gerar Carta Proposta Completa (PDF)
-    </button>
+    <!-- BOTÕES PARA GERAR OS PDFS -->
+    <div class="pdf-actions">
+      <button class="btn-pdf" onclick="gerarPDF(true)">
+        📄 PDF Completo (Com Juros & Detalhes)
+      </button>
+      <button class="btn-pdf-no-interest" onclick="gerarPDF(false)">
+        📑 PDF Comercial (Ocultar Taxa de Juros)
+      </button>
+    </div>
 
     <!-- CARDS DE RESULTADOS -->
     <div class="summary-cards">
@@ -391,7 +420,7 @@
     }
 
     // --- FUNÇÃO DE GERAÇÃO DA CARTA PROPOSTA EM PDF ---
-    function gerarPDF() {
+    function gerarPDF(exibirJuros = true) {
       const { window } = globalThis;
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -405,9 +434,14 @@
       
       const { valorTotalVista, valorPorAlqueire, alqueires, hectares } = calcularValorImovel();
       
-      const numParcelas = document.getElementById('numParcelas').value;
-      const taxaJuros = document.getElementById('taxaJuros').value;
-      const valorTotalBruto = document.getElementById('resTotal').innerText;
+      const numParcelas = parseInt(document.getElementById('numParcelas').value) || 1;
+      const taxaJurosAnual = parseFloat(document.getElementById('taxaJuros').value) || 0;
+      
+      // Cálculo de juros equivalente ao mês (a.m.)
+      const taxaJurosMensal = ((Math.pow(1 + (taxaJurosAnual / 100), 1 / 12) - 1) * 100).toFixed(2);
+      
+      const valorTotalBrutoTexto = document.getElementById('resTotal').innerText;
+      const valorParcelaFixaTexto = document.getElementById('resParcela').innerText;
 
       // Cabeçalho da Proposta
       doc.setFillColor(30, 41, 59);
@@ -449,15 +483,12 @@
 
       // INSERÇÃO DA IMAGEM COM ESCALA SELECIONÁVEL (1x, 2x, 3x)
       if (imagemBase64 && imgDim.width > 0) {
-        // Base padrão de largura (60mm para 1x, 120mm para 2x, 180mm para 3x)
         const baseWidth = 60; 
         let pdfImgWidth = baseWidth * multiplicadorEscala;
-        if (pdfImgWidth > 180) pdfImgWidth = 180; // Limite da largura da folha
+        if (pdfImgWidth > 180) pdfImgWidth = 180;
 
-        // Calcula altura proporcional
         const pdfImgHeight = (imgDim.height * pdfImgWidth) / imgDim.width;
 
-        // Verifica se cabe na página antes de inserir
         if (currentY + pdfImgHeight + 10 > 270) {
           doc.addPage();
           currentY = 20;
@@ -467,7 +498,6 @@
         doc.text("Mapa / Polígono da Área Objeto:", 14, currentY);
         currentY += 4;
 
-        // Desenha a imagem no PDF
         doc.addImage(imagemBase64, imgDim.format, 14, currentY, pdfImgWidth, pdfImgHeight);
         currentY += pdfImgHeight + 6;
       }
@@ -502,8 +532,14 @@
       doc.setFont('helvetica', 'normal');
       doc.text(`1. Valor do Imóvel à Vista Calculado: ${formatarBRL(valorTotalVista)} (Valorado em R$ ${valorPorAlqueire.toLocaleString('pt-BR')}/Alqueire).`, 14, currentY);
       currentY += 5;
-      doc.text(`2. Valor Total do Parcelamento (${numParcelas}x anuais a ${taxaJuros}% a.a.): ${valorTotalBruto}`, 14, currentY);
+
+      if (exibirJuros) {
+        doc.text(`2. Valor Total do Parcelamento (${numParcelas}x anuais com taxa de ${taxaJurosAnual}% a.a. / ${taxaJurosMensal}% a.m.): ${valorTotalBrutoTexto}`, 14, currentY);
+      } else {
+        doc.text(`2. Valor Total do Parcelamento em ${numParcelas}x anuais de ${valorParcelaFixaTexto}: ${valorTotalBrutoTexto}`, 14, currentY);
+      }
       currentY += 5;
+
       doc.text("3. O imóvel não poderá sofrer exploração nas áreas de Mata Nativa e Reserva Legal até que todas parcelas sejam quitadas.", 14, currentY);
       currentY += 5;
       doc.text("4. A autorização para desmembramento somente ocorrerá frente à quitação integral de todas as parcelas.", 14, currentY);
@@ -541,8 +577,73 @@
       doc.text("CRONOGRAMA DE PAGAMENTO E AMORTIZAÇÃO:", 14, currentY);
       currentY += 4;
 
+      // Estrutura dinâmica para esconder/mostrar colunas no PDF
+      let tableHead = [];
+      let tableBody = [];
+      let anoAtual = new Date().getFullYear();
+      let PV = parseFloat(document.getElementById('valorVista').value) || valorTotalVista;
+      let i = (taxaJurosAnual) / 100;
+      
+      let pmt = 0;
+      if (i === 0) pmt = PV / numParcelas;
+      else if (numParcelas === 1) pmt = PV;
+      else {
+        const fatorAnuidade = (1 - Math.pow(1 + i, -(numParcelas - 1))) / i;
+        pmt = PV / (1 + fatorAnuidade);
+      }
+
+      const totalBrutoCalculado = pmt * numParcelas;
+
+      if (exibirJuros) {
+        tableHead = [['Parcela', 'Saldo Inicial', 'Juros', 'Amortização', 'Valor da Parcela']];
+        let saldoDevedor = PV;
+
+        for (let k = 1; k <= numParcelas; k++) {
+          let juros = 0;
+          let amortizacao = 0;
+          let saldoInicial = saldoDevedor;
+
+          if (k === 1) {
+            juros = 0;
+            amortizacao = pmt;
+            saldoDevedor -= amortizacao;
+          } else {
+            juros = saldoDevedor * i;
+            amortizacao = pmt - juros;
+            saldoDevedor -= amortizacao;
+          }
+          if (Math.abs(saldoDevedor) < 0.01) saldoDevedor = 0;
+
+          tableBody.push([
+            `${k}ª (Ago/${anoAtual + k - 1}) ${k === 1 ? '(Entrada)' : ''}`,
+            formatarBRL(saldoInicial),
+            formatarBRL(juros),
+            formatarBRL(amortizacao),
+            formatarBRL(pmt)
+          ]);
+        }
+      } else {
+        // Tabela simplificada COM SALDO BRUTO TOTAL ABATENDO CADA PARCELA
+        tableHead = [['Parcela / Vencimento', 'Saldo Restante Inicial', 'Valor da Parcela']];
+        let saldoBrutoRestante = totalBrutoCalculado;
+
+        for (let k = 1; k <= numParcelas; k++) {
+          let saldoInicialMomento = saldoBrutoRestante;
+          saldoBrutoRestante -= pmt;
+
+          if (Math.abs(saldoBrutoRestante) < 0.01) saldoBrutoRestante = 0;
+
+          tableBody.push([
+            `${k}ª Parcela (Ago/${anoAtual + k - 1}) ${k === 1 ? '(Entrada)' : ''}`,
+            formatarBRL(saldoInicialMomento),
+            formatarBRL(pmt)
+          ]);
+        }
+      }
+
       doc.autoTable({
-        html: '#tabelaCronograma',
+        head: tableHead,
+        body: tableBody,
         startY: currentY,
         theme: 'grid',
         headStyles: { fillStyle: 'F', fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
@@ -565,8 +666,9 @@
       doc.text("Assinatura do Comprador / Proponente", 25, finalY + 5);
       doc.text("Assinatura do Vendedor / Proprietário", 125, finalY + 5);
 
-      // Salvar PDF
-      doc.save(`Carta_Proposta_${matricula.replace(/\./g, '')}.pdf`);
+      // Nome do Arquivo diferenciado
+      const sufixo = exibirJuros ? 'Com_Juros' : 'Comercial';
+      doc.save(`Carta_Proposta_${matricula.replace(/\./g, '')}_${sufixo}.pdf`);
     }
 
     // Event Listeners
