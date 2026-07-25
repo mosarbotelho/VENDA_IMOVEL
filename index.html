@@ -71,6 +71,7 @@
     textarea { resize: vertical; min-height: 80px; line-height: 1.4; }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
+    /* AJUSTES CSS PARA CENTRALIZAÇÃO DA IMAGEM */
     .img-preview-box {
       margin-top: 8px;
       display: none;
@@ -79,12 +80,16 @@
       padding: 10px;
       border-radius: 8px;
       border: 1px dashed var(--border);
+      justify-content: center;
+      align-items: center;
     }
     .img-preview-box img {
       max-width: 100%;
       max-height: 180px;
       border-radius: 6px;
       object-fit: contain;
+      margin: 0 auto;
+      display: block;
     }
 
     .quick-buttons { display: flex; gap: 8px; margin-bottom: 24px; justify-content: center; flex-wrap: wrap; }
@@ -365,18 +370,22 @@
       }
     }
 
+    // PROMISE PARA GESTÃO COMPATÍVEL COM SERVIDORES WEB / GITHUB PAGES
     function carregarPreviewImagemBase64(base64, format = 'JPEG') {
       imagemBase64 = base64;
-      const img = new Image();
-      img.onload = function() {
-        imgDim.width = img.width;
-        imgDim.height = img.height;
-        imgDim.format = format;
-      };
-      img.src = imagemBase64;
-
       document.getElementById('imgPreview').src = imagemBase64;
-      document.getElementById('previewBox').style.display = 'block';
+      document.getElementById('previewBox').style.display = 'flex';
+
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function() {
+          imgDim.width = img.naturalWidth || img.width;
+          imgDim.height = img.naturalHeight || img.height;
+          imgDim.format = format;
+          resolve(imgDim);
+        };
+        img.src = imagemBase64;
+      });
     }
 
     function obterEConverterParaAlqueires() {
@@ -487,7 +496,7 @@
       salvarAutoLocalStorage();
     }
 
-    // --- EXPORTAR DOCUMENTO EM FORMATO WORD (.DOC) RESPEITANDO A ESCALA SELECIONADA ---
+    // EXPORTAR DOCUMENTO DOCX
     function exportarWordComJuros() {
       const dataHoje = new Date().toLocaleDateString('pt-BR');
       const nomePropriedade = document.getElementById('nomePropriedade').value;
@@ -504,7 +513,6 @@
       const valorTotalBrutoTexto = document.getElementById('resTotal').innerText;
       const valorParcelaFixaTexto = document.getElementById('resParcela').innerText;
 
-      // Construção da Tabela de Cronograma em HTML para Word
       let anoAtual = new Date().getFullYear();
       let PV = parseFloat(document.getElementById('valorVista').value) || valorTotalVista;
       let i = (taxaJurosAnual) / 100;
@@ -547,10 +555,8 @@
         `;
       }
 
-      // Cálculo do tamanho proporcional da imagem no Word com base na escala (1x, 2x ou 3x)
       let imagemHtml = '';
       if (imagemBase64) {
-        // Base de largura: 1x = 200px, 2x = 400px, 3x = 600px
         const larguraPixels = Math.round(200 * multiplicadorEscala);
 
         imagemHtml = `
@@ -569,7 +575,6 @@
         `;
       }
 
-      // Estrutura HTML/Word
       const htmlDocument = `<html xmlns:o='urn:schemas-microsoft-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
   <meta charset="utf-8">
@@ -584,9 +589,7 @@
   </xml>
   <![endif]-->
   <style>
-    @page {
-      margin: 20mm 20mm 20mm 20mm;
-    }
+    @page { margin: 20mm 20mm 20mm 20mm; }
     body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.4; color: #1e293b; }
     .header-bg { background-color: #1e293b; color: #ffffff; padding: 15px; text-align: center; font-weight: bold; font-size: 14pt; }
     h2 { color: #0f172a; font-size: 11pt; margin-top: 15px; margin-bottom: 5px; text-transform: uppercase; }
@@ -662,7 +665,6 @@
 </body>
 </html>`;
 
-      // Download do arquivo .doc
       const blob = new Blob(['\ufeff', htmlDocument], { type: 'application/msword;charset=utf-8' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
@@ -671,8 +673,7 @@
       URL.revokeObjectURL(link.href);
     }
 
-    // --- FUNÇÕES DE EXPORTAR E IMPORTAR DADOS (ARQUIVO .JSON) ---
-
+    // EXPORTAR E IMPORTAR JSON
     function coletarDadosFormulario() {
       return {
         nomePropriedade: document.getElementById('nomePropriedade').value,
@@ -692,7 +693,7 @@
       };
     }
 
-    function aplicarDadosFormulario(dados) {
+    async function aplicarDadosFormulario(dados) {
       if (!dados) return;
 
       if (dados.nomePropriedade !== undefined) document.getElementById('nomePropriedade').value = dados.nomePropriedade;
@@ -709,7 +710,7 @@
       if (dados.observacoesAdicionais !== undefined) document.getElementById('observacoesAdicionais').value = dados.observacoesAdicionais;
 
       if (dados.imagemBase64) {
-        carregarPreviewImagemBase64(dados.imagemBase64, dados.imgDim?.format || 'JPEG');
+        await carregarPreviewImagemBase64(dados.imagemBase64, dados.imgDim?.format || 'JPEG');
       } else {
         imagemBase64 = null;
         document.getElementById('previewBox').style.display = 'none';
@@ -736,10 +737,10 @@
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = async function(e) {
         try {
           const dados = JSON.parse(e.target.result);
-          aplicarDadosFormulario(dados);
+          await aplicarDadosFormulario(dados);
           alert('Simulação carregada com sucesso!');
         } catch (err) {
           alert('Erro ao carregar o arquivo. Certifique-se de que é um arquivo .json válido gerado pelo aplicativo.');
@@ -754,17 +755,17 @@
       localStorage.setItem('simulador_rural_dados', JSON.stringify(dados));
     }
 
-    function carregarAutoLocalStorage() {
+    async function carregarAutoLocalStorage() {
       const dadosSalvos = localStorage.getItem('simulador_rural_dados');
       if (dadosSalvos) {
         try {
-          aplicarDadosFormulario(JSON.parse(dadosSalvos));
+          await aplicarDadosFormulario(JSON.parse(dadosSalvos));
         } catch(e) {}
       }
     }
 
-    // --- FUNÇÃO DE GERAÇÃO DA CARTA PROPOSTA EM PDF ---
-    function gerarPDF(exibirJuros = true) {
+    // GERAÇÃO DE PDF COM TRATAMENTO ASSÍNCRONO E FALLBACK
+    async function gerarPDF(exibirJuros = true) {
       const { window } = globalThis;
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -824,16 +825,23 @@
       doc.text(linhasPerimetro, 14, currentY);
       currentY += (linhasPerimetro.length * 4) + 2;
 
-      // INSERÇÃO DA IMAGEM COM ESCALA SELECIONÁVEL (CENTRALIZADA)
-      if (imagemBase64 && imgDim.width > 0) {
+      // INSERÇÃO DA IMAGEM COM ESCALA SELECIONÁVEL E CENTRALIZAÇÃO GARANTIDA NO GITHUB
+      if (imagemBase64) {
+        // Garantimos o carregamento das dimensões reais via Promise
+        await carregarPreviewImagemBase64(imagemBase64, imgDim.format || 'JPEG');
+
         const baseWidth = 60; 
         let pdfImgWidth = baseWidth * multiplicadorEscala;
         if (pdfImgWidth > 180) pdfImgWidth = 180;
 
-        const pdfImgHeight = (imgDim.height * pdfImgWidth) / imgDim.width;
+        // Fallbacks para evitar divisão por zero se a imagem não carregar a tempo
+        const larguraReal = imgDim.width > 0 ? imgDim.width : 400;
+        const alturaReal = imgDim.height > 0 ? imgDim.height : 300;
 
-        // Cálculo dinâmico para centralizar horizontalmente na folha A4 (210mm)
-        const pdfImgX = (210 - pdfImgWidth) / 2;
+        const pdfImgHeight = (alturaReal * pdfImgWidth) / larguraReal;
+
+        // Cálculo dinâmico rigoroso para centralização
+        const pdfImgX = Number((210 - pdfImgWidth) / 2);
 
         if (currentY + pdfImgHeight + 10 > 270) {
           doc.addPage();
@@ -842,10 +850,9 @@
         
         doc.setFont('helvetica', 'bold');
         doc.text("Mapa / Polígono da Área Objeto:", 14, currentY);
-        currentY += 4;
+        currentY += 6;
 
-        // Imagem renderizada no centro usando 'pdfImgX'
-        doc.addImage(imagemBase64, imgDim.format, pdfImgX, currentY, pdfImgWidth, pdfImgHeight);
+        doc.addImage(imagemBase64, imgDim.format || 'JPEG', pdfImgX, currentY, pdfImgWidth, pdfImgHeight);
         currentY += pdfImgHeight + 6;
       }
 
@@ -897,7 +904,7 @@
       doc.text(linhasInadimplencia, 14, currentY);
       currentY += (linhasInadimplencia.length * 4) + 5;
 
-      // OBSERVAÇÕES ADICIONAIS (SE PREENCHIDO)
+      // OBSERVAÇÕES ADICIONAIS
       if (obsInput !== '') {
         if (currentY + 20 > 270) {
           doc.addPage();
