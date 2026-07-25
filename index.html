@@ -233,9 +233,9 @@
       <div class="form-group">
         <label>Tamanho da Imagem no Documento</label>
         <select id="escalaImagem">
-          <option value="1" selected>1x (Padrão - 60mm)</option>
-          <option value="2">2x (Médio - 120mm)</option>
-          <option value="3">3x (Grande - 180mm Largura Máxima)</option>
+          <option value="1" selected>1x (Padrão - ~200px)</option>
+          <option value="2">2x (Médio - ~400px)</option>
+          <option value="3">3x (Grande - ~600px)</option>
         </select>
       </div>
       <div class="form-group full-width">
@@ -263,7 +263,7 @@
 
       <!-- CAMPO EDITÁVEL DE OBSERVAÇÕES ADICIONAIS -->
       <div class="form-group full-width">
-        <label>Observações Adicionais / Cláusulas Especiais (Opcional)</label>
+        <label>Observações Adicional / Cláusulas Especiais (Opcional)</label>
         <textarea id="observacoesAdicionais" placeholder="Insira aqui observações específicas, prazos diferenciados, condições para entrega da posse, benfeitorias inclusas, etc."></textarea>
       </div>
     </div>
@@ -487,13 +487,14 @@
       salvarAutoLocalStorage();
     }
 
-    // --- EXPORTAR DOCUMENTO EM FORMATO WORD (.DOC) COM IMAGEM DIRETA NO TEXTO ---
+    // --- EXPORTAR DOCUMENTO EM FORMATO WORD (.DOC) RESPEITANDO A ESCALA SELECIONADA ---
     function exportarWordComJuros() {
       const dataHoje = new Date().toLocaleDateString('pt-BR');
       const nomePropriedade = document.getElementById('nomePropriedade').value;
       const matricula = document.getElementById('matriculaImovel').value;
       const textoPerimetroInput = document.getElementById('descricaoPerimetro').value;
       const obsInput = document.getElementById('observacoesAdicionais').value.trim();
+      const multiplicadorEscala = parseFloat(document.getElementById('escalaImagem').value) || 1;
       
       const { valorTotalVista, valorPorAlqueire, alqueires, hectares } = calcularValorImovel();
       const numParcelas = parseInt(document.getElementById('numParcelas').value) || 1;
@@ -546,13 +547,16 @@
         `;
       }
 
-      // Inserção da Imagem diretamente em Base64
+      // Cálculo do tamanho proporcional da imagem no Word com base na escala (1x, 2x ou 3x)
       let imagemHtml = '';
       if (imagemBase64) {
+        // Base de largura: 1x = 200px, 2x = 400px, 3x = 600px
+        const larguraPixels = Math.round(200 * multiplicadorEscala);
+
         imagemHtml = `
           <h3 style="color:#1e293b; margin-top:15px; font-size:11pt; text-transform:uppercase;">Mapa / Polígono da Área Objeto:</h3>
           <p style="text-align:center; margin:15px 0;">
-            <img src="${imagemBase64}" style="max-width:550px; width:100%; height:auto; display:block; margin:0 auto;" alt="Polígono"/>
+            <img src="${imagemBase64}" width="${larguraPixels}" style="width:${larguraPixels}px; max-width:100%; height:auto; display:block; margin:0 auto;" alt="Polígono"/>
           </p>
         `;
       }
@@ -565,7 +569,7 @@
         `;
       }
 
-      // Estrutura HTML/Word que abre nativamente exibindo a imagem dentro do documento
+      // Estrutura HTML/Word
       const htmlDocument = `<html xmlns:o='urn:schemas-microsoft-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
   <meta charset="utf-8">
@@ -820,13 +824,16 @@
       doc.text(linhasPerimetro, 14, currentY);
       currentY += (linhasPerimetro.length * 4) + 2;
 
-      // INSERÇÃO DA IMAGEM COM ESCALA SELECIONÁVEL
+      // INSERÇÃO DA IMAGEM COM ESCALA SELECIONÁVEL (CENTRALIZADA)
       if (imagemBase64 && imgDim.width > 0) {
         const baseWidth = 60; 
         let pdfImgWidth = baseWidth * multiplicadorEscala;
         if (pdfImgWidth > 180) pdfImgWidth = 180;
 
         const pdfImgHeight = (imgDim.height * pdfImgWidth) / imgDim.width;
+
+        // Cálculo dinâmico para centralizar horizontalmente na folha A4 (210mm)
+        const pdfImgX = (210 - pdfImgWidth) / 2;
 
         if (currentY + pdfImgHeight + 10 > 270) {
           doc.addPage();
@@ -837,11 +844,12 @@
         doc.text("Mapa / Polígono da Área Objeto:", 14, currentY);
         currentY += 4;
 
-        doc.addImage(imagemBase64, imgDim.format, 14, currentY, pdfImgWidth, pdfImgHeight);
+        // Imagem renderizada no centro usando 'pdfImgX'
+        doc.addImage(imagemBase64, imgDim.format, pdfImgX, currentY, pdfImgWidth, pdfImgHeight);
         currentY += pdfImgHeight + 6;
       }
 
-      const textoLei = "(Lei 10.406/2002, Art. 500, parágrafo 1º – Aceita-se a variação de 1/20 do total estabelecido em contrato. Presume-se que a referência às dimensões foi simplesmente enunciativa quando a diferença não exceder 1/20 da área total enunciada). Área de potencial topográfico, constituída das classes de Pastagem, Mata Nativa e Reserva Legal. Área regular diante do INCRA, com todos os impostos em dia.";
+      const textoLei = "(Lei 10.406/2002, Art. 500, parágrafo 1º – Aceita-se a variação de 1/20 do total estabelecido no contrato. Presume-se que a referência às dimensões foi simplesmente enunciativa quando a diferença não exceder 1/20 da área total enunciada). Área de potencial topográfico, constituída das classes de Pastagem, Mata Nativa e Reserva Legal. Área regular diante do INCRA, com todos os impostos em dia.";
       
       if (currentY + 25 > 270) {
         doc.addPage();
