@@ -19,6 +19,8 @@
       --green: #4ade80;
       --coffee: #eab308;
       --purple: #a855f7;
+      --blue-word: #2563eb;
+      --blue-word-hover: #1d4ed8;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -91,7 +93,7 @@
 
     .pdf-actions {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 12px;
       margin-bottom: 24px;
     }
@@ -100,10 +102,10 @@
       background: #10b981;
       color: #ffffff;
       border: none;
-      padding: 14px 20px;
+      padding: 14px 16px;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 700;
       transition: 0.2s;
       display: flex;
@@ -118,10 +120,10 @@
       background: #0284c7;
       color: #ffffff;
       border: none;
-      padding: 14px 20px;
+      padding: 14px 16px;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 700;
       transition: 0.2s;
       display: flex;
@@ -131,6 +133,24 @@
       text-align: center;
     }
     .btn-pdf-no-interest:hover { background: #0369a1; }
+
+    .btn-word {
+      background: var(--blue-word);
+      color: #ffffff;
+      border: none;
+      padding: 14px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 700;
+      transition: 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-align: center;
+    }
+    .btn-word:hover { background: var(--blue-word-hover); }
 
     .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
     .card { background: var(--bg-color); padding: 16px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
@@ -211,7 +231,7 @@
         <input type="file" id="imagemPoligono" accept="image/png, image/jpeg, image/jpg" onchange="previewImagem(event)">
       </div>
       <div class="form-group">
-        <label>Tamanho da Imagem no PDF</label>
+        <label>Tamanho da Imagem no Documento</label>
         <select id="escalaImagem">
           <option value="1" selected>1x (Padrão - 60mm)</option>
           <option value="2">2x (Médio - 120mm)</option>
@@ -253,13 +273,16 @@
       <button class="btn-preset" onclick="setTaxa(15.0)">Atrelar à Carteira (15,0% a.a.)</button>
     </div>
 
-    <!-- BOTÕES PARA GERAR OS PDFS -->
+    <!-- BOTÕES PARA GERAR PDFS E DOCX -->
     <div class="pdf-actions">
       <button class="btn-pdf" onclick="gerarPDF(true)">
-        📄 PDF Completo (Com Juros & Detalhes)
+        📄 PDF Completo
       </button>
       <button class="btn-pdf-no-interest" onclick="gerarPDF(false)">
-        📑 PDF Comercial (Ocultar Taxa de Juros)
+        📑 PDF Comercial
+      </button>
+      <button class="btn-word" onclick="exportarWordComJuros()">
+        📝 Exportar Word (.doc)
       </button>
     </div>
 
@@ -464,6 +487,186 @@
       salvarAutoLocalStorage();
     }
 
+    // --- EXPORTAR DOCUMENTO EM FORMATO WORD (.DOC) COM IMAGEM DIRETA NO TEXTO ---
+    function exportarWordComJuros() {
+      const dataHoje = new Date().toLocaleDateString('pt-BR');
+      const nomePropriedade = document.getElementById('nomePropriedade').value;
+      const matricula = document.getElementById('matriculaImovel').value;
+      const textoPerimetroInput = document.getElementById('descricaoPerimetro').value;
+      const obsInput = document.getElementById('observacoesAdicionais').value.trim();
+      
+      const { valorTotalVista, valorPorAlqueire, alqueires, hectares } = calcularValorImovel();
+      const numParcelas = parseInt(document.getElementById('numParcelas').value) || 1;
+      const taxaJurosAnual = parseFloat(document.getElementById('taxaJuros').value) || 0;
+      const taxaJurosMensal = ((Math.pow(1 + (taxaJurosAnual / 100), 1 / 12) - 1) * 100).toFixed(2);
+      
+      const valorTotalBrutoTexto = document.getElementById('resTotal').innerText;
+      const valorParcelaFixaTexto = document.getElementById('resParcela').innerText;
+
+      // Construção da Tabela de Cronograma em HTML para Word
+      let anoAtual = new Date().getFullYear();
+      let PV = parseFloat(document.getElementById('valorVista').value) || valorTotalVista;
+      let i = (taxaJurosAnual) / 100;
+      
+      let pmt = 0;
+      if (i === 0) pmt = PV / numParcelas;
+      else if (numParcelas === 1) pmt = PV;
+      else {
+        const fatorAnuidade = (1 - Math.pow(1 + i, -(numParcelas - 1))) / i;
+        pmt = PV / (1 + fatorAnuidade);
+      }
+
+      let tabelaHtmlRows = '';
+      let saldoDevedor = PV;
+
+      for (let k = 1; k <= numParcelas; k++) {
+        let juros = 0;
+        let amortizacao = 0;
+        let saldoInicial = saldoDevedor;
+
+        if (k === 1) {
+          juros = 0;
+          amortizacao = pmt;
+          saldoDevedor -= amortizacao;
+        } else {
+          juros = saldoDevedor * i;
+          amortizacao = pmt - juros;
+          saldoDevedor -= amortizacao;
+        }
+        if (Math.abs(saldoDevedor) < 0.01) saldoDevedor = 0;
+
+        tabelaHtmlRows += `
+          <tr>
+            <td style="border:1px solid #cccccc; padding:6px; text-align:left;">${k}ª (Ago/${anoAtual + k - 1}) ${k === 1 ? '(Entrada)' : ''}</td>
+            <td style="border:1px solid #cccccc; padding:6px; text-align:right;">${formatarBRL(saldoInicial)}</td>
+            <td style="border:1px solid #cccccc; padding:6px; text-align:right;">${formatarBRL(juros)}</td>
+            <td style="border:1px solid #cccccc; padding:6px; text-align:right;">${formatarBRL(amortizacao)}</td>
+            <td style="border:1px solid #cccccc; padding:6px; text-align:right; font-weight:bold;">${formatarBRL(pmt)}</td>
+          </tr>
+        `;
+      }
+
+      // Inserção da Imagem diretamente em Base64
+      let imagemHtml = '';
+      if (imagemBase64) {
+        imagemHtml = `
+          <h3 style="color:#1e293b; margin-top:15px; font-size:11pt; text-transform:uppercase;">Mapa / Polígono da Área Objeto:</h3>
+          <p style="text-align:center; margin:15px 0;">
+            <img src="${imagemBase64}" style="max-width:550px; width:100%; height:auto; display:block; margin:0 auto;" alt="Polígono"/>
+          </p>
+        `;
+      }
+
+      let obsHtml = '';
+      if (obsInput !== '') {
+        obsHtml = `
+          <h3 style="color:#1e293b; margin-top:15px; font-size:11pt; text-transform:uppercase;">OBSERVAÇÕES ADICIONAIS / CLÁUSULAS ESPECIAIS:</h3>
+          <p style="text-align:justify;">${obsInput.replace(/\n/g, '<br/>')}</p>
+        `;
+      }
+
+      // Estrutura HTML/Word que abre nativamente exibindo a imagem dentro do documento
+      const htmlDocument = `<html xmlns:o='urn:schemas-microsoft-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+  <meta charset="utf-8">
+  <title>Carta Proposta de Venda Imobiliária Rural</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    @page {
+      margin: 20mm 20mm 20mm 20mm;
+    }
+    body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.4; color: #1e293b; }
+    .header-bg { background-color: #1e293b; color: #ffffff; padding: 15px; text-align: center; font-weight: bold; font-size: 14pt; }
+    h2 { color: #0f172a; font-size: 11pt; margin-top: 15px; margin-bottom: 5px; text-transform: uppercase; }
+    h3 { color: #0f172a; font-size: 11pt; margin-top: 15px; margin-bottom: 5px; text-transform: uppercase; }
+    p { margin-bottom: 8px; text-align: justify; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9.5pt; }
+    th { background-color: #1e293b; color: #ffffff; padding: 8px; text-align: right; border: 1px solid #1e293b; }
+    th:first-child { text-align: left; }
+    .assinaturas { margin-top: 50px; width: 100%; border: none; }
+    .assinaturas td { border: none; }
+    .assinatura-linha { border-top: 1px solid #000; width: 220px; text-align: center; padding-top: 5px; font-size: 9pt; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="header-bg">
+    CARTA PROPOSTA DE VENDA IMOBILIÁRIA RURAL
+  </div>
+  <p style="text-align:center; font-size:9.5pt; margin-top:5px; color:#555;">
+    <strong>Data de Emissão:</strong> ${dataHoje} &nbsp;|&nbsp; <strong>Matrícula nº:</strong> ${matricula}
+  </p>
+
+  <h2>PROPRIEDADE: ${nomePropriedade.toUpperCase()}</h2>
+  <p>Esta proposta incide apenas sobre o percentual da área da matrícula nº <strong>${matricula}</strong>. O montante desta gleba limita-se a um total de <strong>${hectares.toFixed(4)} hectares</strong> (aproximadamente <strong>${alqueires.toFixed(4)} alqueires</strong>).</p>
+
+  <h3>Descrição do Perímetro / Confrontantes:</h3>
+  <p>${textoPerimetroInput.replace(/\n/g, '<br/>')}</p>
+
+  ${imagemHtml}
+
+  <p style="font-style:italic; font-size:9pt; color:#444; margin-top:10px;">
+    (Lei 10.406/2002, Art. 500, parágrafo 1º – Aceita-se a variação de 1/20 do total estabelecido em contrato. Presume-se que a referência às dimensões foi simplesmente enunciativa quando a diferença não exceder 1/20 da área total enunciada). Área de potencial topográfico, constituída das classes de Pastagem, Mata Nativa e Reserva Legal. Área regular diante do INCRA, com todos os impostos em dia.
+  </p>
+
+  <h3>PREÇO DA GLEBA E CUSTAS TRÂMITES:</h3>
+  <p>Ressalta-se que a alienação está direcionada à gleba com seu potencial agrícola. As custas dos trâmites de todo valor direto e indireto ligado à alienação deste OBJETO, como custas com retificação de plantas topográficas para desmembramento, locação das áreas em campo, confecção de escritura, processo de registro de imóvel, ficarão a cargo do COMPRADOR.</p>
+
+  <h3>CONDIÇÕES DO NEGÓCIO E VALORES CALCULADOS:</h3>
+  <p>1. <strong>Valor do Imóvel à Vista Calculado:</strong> ${formatarBRL(valorTotalVista)} (Valorado em R$ ${valorPorAlqueire.toLocaleString('pt-BR')}/Alqueire).</p>
+  <p>2. <strong>Valor Total do Parcelamento:</strong> ${valorTotalBrutoTexto} (${numParcelas}x anuais de ${valorParcelaFixaTexto} com taxa de ${taxaJurosAnual}% a.a. / ${taxaJurosMensal}% a.m.).</p>
+  <p>3. O imóvel não poderá sofrer exploração nas áreas de Mata Nativa e Reserva Legal até que todas parcelas sejam quitadas.</p>
+  <p>4. A autorização para desmembramento somente ocorrerá frente à quitação integral de todas as parcelas.</p>
+  <p>5. Caso o pagamento de alguma parcela não ocorra, ficará autorizado ao proprietário (constante no registro nº 45.568) a alienação de parte desta gleba/divisão até que o valor total do saldo devedor seja quitado de forma integral.</p>
+
+  ${obsHtml}
+
+  <h3>CRONOGRAMA DE PAGAMENTO E AMORTIZAÇÃO (COM JUROS):</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Parcela</th>
+        <th>Saldo Inicial</th>
+        <th>Juros</th>
+        <th>Amortização</th>
+        <th>Valor da Parcela</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tabelaHtmlRows}
+    </tbody>
+  </table>
+
+  <br/><br/>
+  <table class="assinaturas">
+    <tr>
+      <td align="center" width="50%">
+        <div class="assinatura-linha">Assinatura do Comprador / Proponente</div>
+      </td>
+      <td align="center" width="50%">
+        <div class="assinatura-linha">Assinatura do Vendedor / Proprietário</div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+      // Download do arquivo .doc
+      const blob = new Blob(['\ufeff', htmlDocument], { type: 'application/msword;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Carta_Proposta_${matricula.replace(/\./g, '')}_Editavel.doc`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
     // --- FUNÇÕES DE EXPORTAR E IMPORTAR DADOS (ARQUIVO .JSON) ---
 
     function coletarDadosFormulario() {
@@ -539,10 +742,9 @@
         }
       };
       reader.readAsText(file);
-      event.target.value = ''; // Limpa o input
+      event.target.value = '';
     }
 
-    // Salva estado automatico no navegador
     function salvarAutoLocalStorage() {
       const dados = coletarDadosFormulario();
       localStorage.setItem('simulador_rural_dados', JSON.stringify(dados));
